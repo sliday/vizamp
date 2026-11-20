@@ -80,5 +80,18 @@ Canvas {
             ctx.fill()
         }
         ctx.globalAlpha = 1
+
+        // New samples enter at the right edge and old samples leave at the left.
+        const edgeFraction = Math.min(16, width * 0.12) / width
+        const mask = ctx.createLinearGradient(0, 0, width, 0)
+        mask.addColorStop(0, "transparent")
+        mask.addColorStop(edgeFraction, "white")
+        mask.addColorStop(1 - edgeFraction, "white")
+        mask.addColorStop(1, "transparent")
+        ctx.save()
+        ctx.globalCompositeOperation = "destination-in"
+        ctx.fillStyle = mask
+        ctx.fillRect(0, 0, width, height)
+        ctx.restore()
     }
 }
