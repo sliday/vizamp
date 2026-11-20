@@ -2,7 +2,9 @@
 
 Vizamp puts a live audio spectrum in your Omarchy bar. Peaks throw sparks, and the spectrum reshapes into the track title. Hover to see the title or click to play and pause. The colors follow your theme.
 
-![Vizamp on dark and light bars, with the dot-matrix track title](preview.png)
+![Vizamp animates a spectrum and track title on dark and light bars](docs/vizamp-demo.gif)
+
+[Watch the MP4](docs/vizamp-demo.mp4) · Recorded offscreen with sample audio levels.
 
 ## Install
 

@@ -2,8 +2,9 @@
   "schemaVersion": 1,
   "id": "sliday.vizamp",
   "name": "Vizamp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Sliday",
+  "license": "GPL-3.0-or-later",
   "description": "Live speaker spectrum and animated track titles for the Omarchy bar",
   "kinds": ["bar-widget", "service"],
   "entryPoints": { "barWidget": "BarWidget.qml", "service": "Service.qml" },
@@ -11,7 +12,7 @@
     "displayName": "Vizamp",
     "description": "Live speaker spectrum and track titles",
     "category": "Media",
-    "defaultSection": "centerEnd",
+    "defaultSection": "center",
     "allowMultiple": false
   }
 }
