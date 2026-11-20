@@ -1,7 +1,7 @@
 .pragma library
 
-const laneCount = 6
-const travelSeconds = 0.62
+const laneCount = 8
+const travelSeconds = 0.70
 const hitSeconds = 0.18
 const retriggerSeconds = 0.19
 const vibrationSeconds = 0.29

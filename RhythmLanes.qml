@@ -16,7 +16,7 @@ Canvas {
     property var lookOverrides: ({})
     readonly property var look: Object.assign({
         railOpacity: 0.28, laneTaper: 0.23, noteSway: 0.23,
-        trailLifetime: 0.075, trailGlow: 0.28, heatMix: 0.65, hitGlow: 0.42,
+        trailLifetime: 0.085, trailGlow: 0.28, heatMix: 0.65, hitGlow: 0.42,
         sparkCount: 3, sparkSpeed: 55, sparkLife: 0.22
     }, lookOverrides)
     property var activity: Rhythm.empty()
@@ -26,8 +26,16 @@ Canvas {
     property real motionClock: 0
     readonly property bool lightBackground: Palette.isLight(Palette.rgb(background))
     readonly property var laneColors: {
-        const colors = [ink, "#eb8055", "#d864a4", "#9e89ef", "#53b9c0", "#83bb72"]
+        const colors = [ink, "#eb8055", "#db639b", "#a488f1",
+            "#619aff", "#51c3c3", "#75bf80", "#c4d36b"]
         return colors.map(color => Palette.readableColor(Qt.lighter(color, 1), background))
+    }
+    readonly property var noteColors: {
+        const highlight = lightBackground ? [0.18, 0.09, 0.16] : [1, 0.96, 0.86]
+        return laneColors.map(color => {
+            const rgb = Palette.mix(Palette.rgb(color), highlight, lightBackground ? 0.24 : 0.30)
+            return Qt.rgba(rgb[0], rgb[1], rgb[2], 1)
+        })
     }
     readonly property var heatStops: {
         const backdrop = Palette.rgb(background)
@@ -258,16 +266,16 @@ Canvas {
                 ctx.stroke()
             }
 
-            ctx.fillStyle = warmColor(laneInk, heat, look.heatMix * strength * progress * 0.58)
+            ctx.fillStyle = warmColor(noteColors[note.lane], heat, look.heatMix * strength * progress * 0.46)
             ctx.globalAlpha = enter
             ctx.beginPath()
             ctx.arc(x, y, weight * 0.62, 0, Math.PI * 2)
             ctx.fill()
-            if (heat > 0.59 && strength > 0.65) {
+            if (strength > 0.48) {
                 ctx.fillStyle = lightBackground ? "#391a16" : "#fff0ce"
-                ctx.globalAlpha = enter * strength * progress * 0.57
+                ctx.globalAlpha = enter * strength * (0.24 + 0.44 * progress)
                 ctx.beginPath()
-                ctx.arc(x - weight * 0.14, y, weight * 0.23, 0, Math.PI * 2)
+                ctx.arc(x - weight * 0.14, y, weight * 0.28, 0, Math.PI * 2)
                 ctx.fill()
             }
         }
