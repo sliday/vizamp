@@ -8,7 +8,7 @@ Vizamp puts a live audio spectrum in your Omarchy bar. Peaks throw sparks, and t
 - **Right-click** to cycle through the particle ridge, stacked bars, a scrolling spectrogram, and five rhythm lanes. Vizamp remembers your choice.
 - **Shift + right-click** to toggle compact width. This is saved separately from the view.
 
-The spectrogram shows bass at the bottom and recent audio at the right. Rhythm lanes turn sudden peaks into notes that travel toward the hit line. With reduced motion enabled, titles stay still, the spectrogram fills in place, and rhythm notes light up at the line.
+The spectrogram shows bass at the bottom. New samples fade in on the right and fade out as they leave on the left. Rhythm lanes turn sudden peaks into notes that travel toward the hit line. With reduced motion enabled, titles stay still, the spectrogram fills in place, and rhythm notes light up at the line.
 
 ![Vizamp cycles through Ridge, Stacked Bars, Spectrogram, and Rhythm Lanes](docs/vizamp-demo.gif)
 
