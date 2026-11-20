@@ -16,14 +16,14 @@ function advance(sparks, arrivals, laneHeat, dt, look, random = Math.random) {
         })
     }
     for (const note of arrivals) {
-        const heat = Math.max(0.5 + note.strength * 0.4, laneHeat[note.lane] || 0)
+        const heat = Math.max(0.40 + note.strength * 0.48, laneHeat[note.lane] || 0)
         const count = Math.max(1, Math.round(look.sparkCount * (0.55 + 0.45 * note.strength)))
         for (let i = 0; i < count && next.length < sparkLimit; i++) {
             const y = (random() - 0.5) * 0.18
             next.push({
                 lane: note.lane, x: 0, y, oldX: 0, oldY: y, age: 0,
-                vx: look.sparkSpeed * (0.55 + random() * 0.7),
-                vy: (random() - 0.5) * 3.2,
+                vx: look.sparkSpeed * (0.27 + 0.32 * note.strength + 0.27 * (note.velocity ?? note.strength) + random() * 0.63),
+                vy: (random() - 0.5) * (1.6 + 1.6 * note.strength),
                 life: look.sparkLife * (0.82 + 0.36 * random()),
                 heat
             })
