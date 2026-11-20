@@ -1,6 +1,10 @@
 # Vizamp
 
-Vizamp puts a live audio spectrum in your Omarchy bar. Peaks throw sparks, and the spectrum reshapes into the track title. Hover to see the title or click to play and pause. The colors follow your theme.
+Vizamp puts a live audio spectrum in your Omarchy bar. Peaks throw sparks, and the spectrum reshapes into the track title. The colors follow your theme.
+
+- **Hover** for the title and track progress when your player provides it.
+- **Click** to play or pause. **Scroll up** for the previous track or **down** for the next.
+- **Right-click** to switch between the particle ridge and stacked bars. Vizamp remembers your choice.
 
 ![Vizamp’s spectrum and track title above an amber and red stacked meter](docs/vizamp-demo.gif)
 

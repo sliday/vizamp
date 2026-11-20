@@ -1,3 +1,4 @@
 {
-  "audioUnavailable": "Vizamp cannot read speaker audio"
+  "audioUnavailable": "Vizamp cannot read speaker audio",
+  "trackProgress": "%1 of %2 elapsed"
 }

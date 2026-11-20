@@ -21,6 +21,7 @@ BarWidget {
     readonly property bool playing: mediaStatus.playing === true
     readonly property bool capturing: watching && playing && titleMix < 0.999
     readonly property string trackLabel: Status.label(mediaStatus)
+    readonly property bool stackedMode: setting("spectrumMode", "ridge") === "stacked"
 
     readonly property var display: Window.window?.screen
     readonly property real screenSpan: display ? (vertical ? display.height : display.width) : 1280
@@ -48,6 +49,12 @@ BarWidget {
         if (connectedService) connectedService.setConsumer(root, watching, capturing)
     }
 
+    function toggleSpectrumMode() {
+        if (!bar?.shell) return
+        const nextSettings = Object.assign({}, settings, { spectrumMode: stackedMode ? "ridge" : "stacked" })
+        bar.shell.updateEntryInline(moduleName, nextSettings)
+    }
+
     onServiceChanged: Qt.callLater(syncConsumer)
     onWatchingChanged: Qt.callLater(syncConsumer)
     onCapturingChanged: Qt.callLater(syncConsumer)
@@ -64,12 +71,15 @@ BarWidget {
     readonly property var timingPlayer: {
         const list = Mpris.players ? Mpris.players.values : []
         if (!mediaStatus.identity || !mediaStatus.title) return null
-        for (let i=0; i<list.length; ++i) {
-            const p=list[i]
-            if (p.identity===mediaStatus.identity && p.trackTitle===mediaStatus.title
-                && (!mediaStatus.artist || p.trackArtist===mediaStatus.artist)) return p
+        let match = null
+        for (const player of list) {
+            if (player.identity !== mediaStatus.identity || player.trackTitle !== mediaStatus.title
+                || (mediaStatus.desktopEntry && player.desktopEntry !== mediaStatus.desktopEntry)
+                || (mediaStatus.artist && player.trackArtist !== mediaStatus.artist)) continue
+            if (match) return null
+            match = player
         }
-        return null
+        return match
     }
     function syncProgress() {
         const p=timingPlayer
@@ -85,6 +95,10 @@ BarWidget {
         trackProgress=ratio
     }
     onTimingPlayerChanged: syncProgress()
+    Connections {
+        target: root.timingPlayer
+        function onUniqueIdChanged() { root.syncProgress() }
+    }
     Timer {
         interval: 250; running: root.watching && root.playing; repeat: true; triggeredOnStart: true
         onTriggered: root.syncProgress()
@@ -140,30 +154,45 @@ BarWidget {
         width: root.mediaWidth
         height: root.barSize
         rotation: root.vertical ? (root.bar?.position === "left" ? -90 : 90) : 0
-        Loader {
-            id: spectrumView
-            transform: Rotation {
-                origin.x: spectrumView.width / 2
-                origin.y: spectrumView.height / 2
-                axis.x: 1; axis.y: 0; axis.z: 0
-                angle: root.rollAngle * (1 - root.titleMix)
-            }
-            source: Qt.resolvedUrl("SpectrumPlot.qml")
-            onLoaded: {
-                item.trackKey = Qt.binding(() => root.progressTrackKey)
-                item.progress = Qt.binding(() => root.visualProgress)
-                item.handoff = Qt.binding(() => root.titleMix)
-                item.levels = Qt.binding(() => root.motion.levels)
-                item.peaks = Qt.binding(() => root.motion.peaks)
-                item.peakColor = Qt.binding(() => root.titleInk)
-                item.background = Qt.binding(() => root.background)
-                item.ink = Qt.binding(() => root.accentInk)
-            }
+        Item {
+            id: meter
             anchors.centerIn: parent
             width: root.plotWidth
             height: Math.max(9, Math.min(20, root.barSize - 6))
             opacity: root.presence * Math.min(1, (1 - root.titleMix) * 5)
             visible: root.watching && opacity > 0.001
+
+            transform: Rotation {
+                origin.x: meter.width / 2
+                origin.y: meter.height / 2
+                axis.x: 1; axis.y: 0; axis.z: 0
+                angle: root.stackedMode ? 0 : root.rollAngle * (1 - root.titleMix)
+            }
+
+            Loader {
+                id: spectrumView
+                anchors.fill: parent
+                active: !root.stackedMode
+                sourceComponent: SpectrumPlot {
+                    trackKey: root.progressTrackKey
+                    progress: root.visualProgress
+                    handoff: root.titleMix
+                    levels: root.motion.levels
+                    peakColor: root.titleInk
+                    background: root.background
+                    ink: root.accentInk
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: root.stackedMode
+                sourceComponent: StackedBars {
+                    levels: root.motion.levels
+                    peaks: root.motion.peaks
+                    background: root.background
+                }
+            }
         }
 
         Loader {
@@ -179,7 +208,7 @@ BarWidget {
                 item.text=Qt.binding(()=>root.trackLabel)
                 item.fontFamily=Qt.binding(()=>root.bar?root.bar.fontFamily:"monospace")
                 item.ink=Qt.binding(()=>root.titleInk)
-                item.particleOffsetY=Qt.binding(()=>(root.barSize-spectrumView.height)/2)
+                item.particleOffsetY=Qt.binding(()=>(root.barSize-meter.height)/2)
                 item.sandOrigins=Qt.binding(()=>spectrumView.item?spectrumView.item.grains:[])
                 item.amount=Qt.binding(()=>root.watching?root.titleMix:0)
                 item.gathering=Qt.binding(()=>root.watching&&root.showTitle)
@@ -187,6 +216,29 @@ BarWidget {
             }
         }
 
+        Item {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 2
+            width: root.plotWidth
+            height: 1
+            visible: root.watching && root.playing && root.titleMix > 0.9 && root.trackProgress >= 0
+            Accessible.role: Accessible.ProgressBar
+            Accessible.name: strings.t("trackProgress")
+                .arg(Progress.clock(root.trackPosition))
+                .arg(Progress.clock(root.trackDuration))
+
+            Rectangle {
+                anchors.fill: parent
+                color: root.accentInk
+                opacity: 0.25
+            }
+            Rectangle {
+                width: parent.width * Math.max(0, root.trackProgress)
+                height: parent.height
+                color: root.accentInk
+            }
+        }
     }
 
     Text {
@@ -207,10 +259,31 @@ BarWidget {
         onTriggered: root.hovered = true
     }
     MouseArea {
+        id: input
         anchors.fill: parent
         hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-        onClicked: if (root.service) root.service.requestPlaybackToggle()
+        property int wheelDelta: 0
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton) root.toggleSpectrumMode()
+            else if (root.service) root.service.requestPlaybackToggle()
+        }
+        onWheel: wheel => {
+            const delta = wheel.angleDelta.y
+            if (!delta || !root.service
+                || !(delta < 0 ? root.mediaStatus.canGoNext : root.mediaStatus.canGoPrevious)) {
+                wheel.accepted = false
+                return
+            }
+            if (wheelDelta * delta < 0) wheelDelta = 0
+            wheelDelta += delta
+            wheelReset.restart()
+            if (Math.abs(wheelDelta) >= 120) {
+                root.service.requestTrackStep(wheelDelta < 0 ? 1 : -1)
+                wheelDelta = 0
+            }
+        }
         onEntered: {
             if (root.service?.analyzerFailed && root.capturing && root.bar) {
                 root.bar.showTooltip(root, strings.t("audioUnavailable"))
@@ -221,7 +294,13 @@ BarWidget {
         onExited: {
             hoverIntent.stop()
             root.hovered = false
+            wheelDelta = 0
             if (root.bar) root.bar.hideTooltip(root)
         }
+    }
+    Timer {
+        id: wheelReset
+        interval: 200
+        onTriggered: input.wheelDelta = 0
     }
 }

@@ -24,7 +24,18 @@ Item {
     }
 
     function requestPlaybackToggle() {
-        if (!mediaAction.running) mediaAction.running = true
+        runMediaAction("playPause")
+    }
+
+    function requestTrackStep(direction) {
+        if (direction > 0 && mediaStatus.canGoNext) runMediaAction("next")
+        else if (direction < 0 && mediaStatus.canGoPrevious) runMediaAction("previous")
+    }
+
+    function runMediaAction(method) {
+        if (!mediaAction.running) {
+            mediaAction.exec(["timeout", "0.8", "omarchy-shell", "media", method])
+        }
     }
 
     function acceptFrame(line) {
@@ -32,7 +43,7 @@ Item {
         const values = line.split(";")
         if (values.length !== 24) return
         const next = values.map(Number)
-        if (next.some(value => !Number.isFinite(value) || value < 0 || value > 1)) return
+        if (next.some((value, i) => !values[i].trim() || !Number.isFinite(value) || value < 0 || value > 1)) return
         targets = next
         frameTime = Date.now()
         analyzerFailed = false
@@ -72,7 +83,7 @@ Item {
 
     Process {
         id: mediaAction
-        command: ["timeout", "0.8", "omarchy-shell", "media", "playPause"]
+        onExited: if (root.watching && !statusProbe.running) statusProbe.running = true
     }
 
     Process {

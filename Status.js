@@ -9,7 +9,19 @@ function accept(state,raw,now) {
         const info=JSON.parse(raw)
         if(typeof info.playing!=='boolean')throw new Error('Missing playback state')
         const text=(v,n)=>typeof v==='string'?v.slice(0,n):''
-        return {value:{playing:info.playing,identity:text(info.identity,256),title:text(info.title,1024),artist:text(info.artist,1024)},failures:0,lastGood:now}
+        return {
+            value: {
+                playing: info.playing,
+                identity: text(info.identity, 256),
+                desktopEntry: text(info.desktopEntry, 256),
+                title: text(info.title, 1024),
+                artist: text(info.artist, 1024),
+                canGoNext: info.canGoNext === true,
+                canGoPrevious: info.canGoPrevious === true
+            },
+            failures: 0,
+            lastGood: now
+        }
     } catch(e) {return failed(state,now)}
 }
 function label(info) {

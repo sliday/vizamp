@@ -15,7 +15,6 @@ import "Trail.js" as Trail
 Canvas {
     id: root
     property var levels: []
-    property var peaks: []
     property real progress: -1
     property string trackKey: ""
     onTrackKeyChanged: { resetHistory = true; requestPaint() }
@@ -38,7 +37,6 @@ Canvas {
     property var grains: []
     property var bandHeat: []
     property var priorLevels: []
-    property var priorSpeeds: []
     property double lastBurst: 0
     property double nextRadiate: 0
     property var radioState: ({})
@@ -55,7 +53,6 @@ Canvas {
     onHandoffChanged: requestPaint()
     onRevealChanged: requestPaint()
     onLevelsChanged: requestPaint()
-    onPeaksChanged: requestPaint()
     onInkChanged: { resetHistory = true; requestPaint() }
     onBackgroundChanged: { resetHistory = true; requestPaint() }
     onPeakColorChanged: requestPaint()
