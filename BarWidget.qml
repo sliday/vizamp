@@ -26,11 +26,14 @@ BarWidget {
         const configured = setting("spectrumMode", "ridge")
         return modeIds.includes(configured) ? configured : "ridge"
     }
+    readonly property bool compactMode: setting("compactMode", false) === true
 
     readonly property var display: Window.window?.screen
     readonly property real screenSpan: display ? (vertical ? display.height : display.width) : 1280
-    readonly property real mediaWidth: Math.max(84, Math.min(
-        vertical ? 180 : 320, screenSpan * (vertical ? 0.24 : 0.26)))
+    readonly property real mediaWidth: {
+        const limit = compactMode ? (vertical ? 116 : 160) : (vertical ? 180 : 320)
+        return Math.max(84, Math.min(limit, screenSpan * (vertical ? 0.24 : 0.26)))
+    }
     readonly property real idleSize: Math.min(24, barSize)
     readonly property real contentLength: idleSize + (mediaWidth - idleSize) * presence
     readonly property real plotWidth: mediaWidth - 26
@@ -53,11 +56,15 @@ BarWidget {
         if (connectedService) connectedService.setConsumer(root, watching, capturing)
     }
 
-    function cycleSpectrumMode() {
+    function savePresentationSetting(name, value) {
         if (!bar?.shell) return
-        const nextIndex = (modeIds.indexOf(spectrumMode) + 1) % modeIds.length
-        const nextSettings = Object.assign({}, settings, { spectrumMode: modeIds[nextIndex] })
+        const nextSettings = Object.assign({}, settings, { [name]: value })
         if (bar.shell.updateEntryInline(moduleName, nextSettings)) modePreview.restart()
+    }
+
+    function cycleSpectrumMode() {
+        const nextIndex = (modeIds.indexOf(spectrumMode) + 1) % modeIds.length
+        savePresentationSetting("spectrumMode", modeIds[nextIndex])
     }
 
     onServiceChanged: Qt.callLater(syncConsumer)
@@ -73,6 +80,22 @@ BarWidget {
     property real trackPosition: 0
     property real trackDuration: 0
     property string progressTrackKey: ""
+    property string seekTrackKey: ""
+    readonly property bool canScrub: !!timingPlayer?.canSeek && timingPlayer.positionSupported
+        && timingPlayer.lengthSupported && timingPlayer.length > 0 && trackProgress >= 0
+    readonly property bool seekOpen: watching && playing && canScrub && seekTrackKey.length > 0
+        && seekTrackKey === progressTrackKey
+    onSeekOpenChanged: if (!seekOpen) close()
+
+    function close() {
+        seekTrackKey = ""
+    }
+
+    function toggleSeekPopup() {
+        if (seekOpen) close()
+        else if (canScrub && watching && playing) seekTrackKey = progressTrackKey
+    }
+
     readonly property var timingPlayer: {
         const list = Mpris.players ? Mpris.players.values : []
         if (!mediaStatus.identity || !mediaStatus.title) return null
@@ -112,7 +135,7 @@ BarWidget {
     property bool cycleTitle: false
     property bool hovered: false
     readonly property bool showTitle: playing && trackLabel.length > 0
-        && !modePreview.running && (cycleTitle || hovered)
+        && !modePreview.running && (cycleTitle || hovered || seekOpen)
     property real titleMix: showTitle ? 1 : 0
     clip: true
     Behavior on titleMix {
@@ -240,6 +263,7 @@ BarWidget {
             onLoaded: {
                 item.text=Qt.binding(()=>root.trackLabel)
                 item.fontFamily=Qt.binding(()=>root.bar?root.bar.fontFamily:"monospace")
+                item.reducedMotion = Qt.binding(() => Style.reduceMotion)
                 item.ink=Qt.binding(()=>root.titleInk)
                 item.particleOffsetY=Qt.binding(()=>(root.barSize-meter.height)/2)
                 item.sandOrigins=Qt.binding(()=>spectrumView.item?spectrumView.item.grains:[])
@@ -250,6 +274,7 @@ BarWidget {
         }
 
         Item {
+            id: progressStrip
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 2
@@ -270,6 +295,48 @@ BarWidget {
                 width: parent.width * Math.max(0, root.trackProgress)
                 height: parent.height
                 color: root.accentInk
+            }
+        }
+    }
+
+    PopupCard {
+        id: seekPopup
+        anchorItem: root
+        bar: root.bar
+        owner: root
+        open: root.seekOpen
+        contentWidth: fittedContentWidth(Style.space(240))
+        contentHeight: fittedContentHeight(seekControls.implicitHeight)
+
+        Column {
+            id: seekControls
+            anchors.fill: parent
+            spacing: Style.space(4)
+
+            Text {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                textFormat: Text.PlainText
+                text: strings.t("trackProgress")
+                    .arg(Progress.clock(seekSlider.liveValue * root.trackDuration))
+                    .arg(Progress.clock(root.trackDuration))
+                color: Commons.Color.popups.text
+                font.family: root.bar?.fontFamily || "monospace"
+                font.pixelSize: Style.font.body
+            }
+
+            PanelSlider {
+                id: seekSlider
+                width: parent.width
+                bar: root.bar
+                value: Math.max(0, root.trackProgress)
+                step: 0.02
+                Accessible.role: Accessible.Slider
+                Accessible.name: strings.t("seekTrack")
+                onReleased: fraction => {
+                    if (root.seekOpen && root.canScrub)
+                        root.timingPlayer.position = fraction * root.timingPlayer.length
+                }
             }
         }
     }
@@ -295,12 +362,23 @@ BarWidget {
         id: input
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
         property int wheelDelta: 0
+
+        function hitProgress(x, y) {
+            if (!progressStrip.visible) return false
+            const point = progressStrip.mapFromItem(input, x, y)
+            return Math.abs(point.y - 0.5) <= 4 && point.x >= 0 && point.x <= progressStrip.width
+        }
+
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) root.cycleSpectrumMode()
-            else if (root.service) root.service.requestPlaybackToggle()
+            if (mouse.button === Qt.RightButton) {
+                if (mouse.modifiers & Qt.ShiftModifier) root.savePresentationSetting("compactMode", !root.compactMode)
+                else root.cycleSpectrumMode()
+            } else if (mouse.button === Qt.MiddleButton || hitProgress(mouse.x, mouse.y)) {
+                root.toggleSeekPopup()
+            } else if (root.service) root.service.requestPlaybackToggle()
         }
         onWheel: wheel => {
             const delta = wheel.angleDelta.y
