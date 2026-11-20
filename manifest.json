@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "sliday.vizamp",
   "name": "Vizamp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Sliday",
   "license": "GPL-3.0-or-later",
   "description": "Live speaker spectrum and animated track titles for the Omarchy bar",

@@ -3,7 +3,7 @@
 Vizamp puts a live audio spectrum in your Omarchy bar. Peaks throw sparks, and the spectrum reshapes into the track title. The colors follow your theme.
 
 - **Hover** for the title and track progress when your player provides it.
-- **Drag the progress line** to seek when the player supports it.
+- **Click the progress line** or **middle-click** to open a seek slider for players that support it.
 - **Click** to play or pause. **Scroll up** for the previous track or **down** for the next.
 - **Right-click** to cycle through the particle ridge, stacked bars, a scrolling spectrogram, and five rhythm lanes. Vizamp remembers your choice.
 - **Shift + right-click** to toggle compact width. This is saved separately from the view.

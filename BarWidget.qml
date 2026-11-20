@@ -80,7 +80,22 @@ BarWidget {
     property real trackPosition: 0
     property real trackDuration: 0
     property string progressTrackKey: ""
-    readonly property bool canScrub: !!timingPlayer?.canSeek && trackProgress >= 0
+    property string seekTrackKey: ""
+    readonly property bool canScrub: !!timingPlayer?.canSeek && timingPlayer.positionSupported
+        && timingPlayer.lengthSupported && timingPlayer.length > 0 && trackProgress >= 0
+    readonly property bool seekOpen: watching && playing && canScrub && seekTrackKey.length > 0
+        && seekTrackKey === progressTrackKey
+    onSeekOpenChanged: if (!seekOpen) close()
+
+    function close() {
+        seekTrackKey = ""
+    }
+
+    function toggleSeekPopup() {
+        if (seekOpen) close()
+        else if (canScrub && watching && playing) seekTrackKey = progressTrackKey
+    }
+
     readonly property var timingPlayer: {
         const list = Mpris.players ? Mpris.players.values : []
         if (!mediaStatus.identity || !mediaStatus.title) return null
@@ -120,7 +135,7 @@ BarWidget {
     property bool cycleTitle: false
     property bool hovered: false
     readonly property bool showTitle: playing && trackLabel.length > 0
-        && !modePreview.running && (cycleTitle || hovered || input.seekTrack.length > 0)
+        && !modePreview.running && (cycleTitle || hovered || seekOpen)
     property real titleMix: showTitle ? 1 : 0
     clip: true
     Behavior on titleMix {
@@ -260,9 +275,6 @@ BarWidget {
 
         Item {
             id: progressStrip
-            readonly property real displayedProgress: input.seekFraction >= 0 ? input.seekFraction : root.trackProgress
-            readonly property real displayedTime: input.seekFraction >= 0
-                ? input.seekFraction * root.trackDuration : root.trackPosition
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 2
@@ -271,7 +283,7 @@ BarWidget {
             visible: root.watching && root.playing && root.titleMix > 0.9 && root.trackProgress >= 0
             Accessible.role: Accessible.ProgressBar
             Accessible.name: strings.t("trackProgress")
-                .arg(Progress.clock(displayedTime))
+                .arg(Progress.clock(root.trackPosition))
                 .arg(Progress.clock(root.trackDuration))
 
             Rectangle {
@@ -280,9 +292,51 @@ BarWidget {
                 opacity: 0.25
             }
             Rectangle {
-                width: parent.width * Math.max(0, progressStrip.displayedProgress)
+                width: parent.width * Math.max(0, root.trackProgress)
                 height: parent.height
                 color: root.accentInk
+            }
+        }
+    }
+
+    PopupCard {
+        id: seekPopup
+        anchorItem: root
+        bar: root.bar
+        owner: root
+        open: root.seekOpen
+        contentWidth: fittedContentWidth(Style.space(240))
+        contentHeight: fittedContentHeight(seekControls.implicitHeight)
+
+        Column {
+            id: seekControls
+            anchors.fill: parent
+            spacing: Style.space(4)
+
+            Text {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                textFormat: Text.PlainText
+                text: strings.t("trackProgress")
+                    .arg(Progress.clock(seekSlider.liveValue * root.trackDuration))
+                    .arg(Progress.clock(root.trackDuration))
+                color: Commons.Color.popups.text
+                font.family: root.bar?.fontFamily || "monospace"
+                font.pixelSize: Style.font.body
+            }
+
+            PanelSlider {
+                id: seekSlider
+                width: parent.width
+                bar: root.bar
+                value: Math.max(0, root.trackProgress)
+                step: 0.02
+                Accessible.role: Accessible.Slider
+                Accessible.name: strings.t("seekTrack")
+                onReleased: fraction => {
+                    if (root.seekOpen && root.canScrub)
+                        root.timingPlayer.position = fraction * root.timingPlayer.length
+                }
             }
         }
     }
@@ -308,52 +362,23 @@ BarWidget {
         id: input
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
         property int wheelDelta: 0
-        property string seekTrack: ""
-        property real seekStartX: 0
-        property real seekFraction: -1
-        property bool suppressClick: false
 
-        function endSeek() {
-            seekTrack = ""
-            seekFraction = -1
+        function hitProgress(x, y) {
+            if (!progressStrip.visible) return false
+            const point = progressStrip.mapFromItem(input, x, y)
+            return Math.abs(point.y - 0.5) <= 4 && point.x >= 0 && point.x <= progressStrip.width
         }
 
-        onPressed: mouse => {
-            suppressClick = false
-            endSeek()
-            if (mouse.button !== Qt.LeftButton || !progressStrip.visible || !root.canScrub) return
-            const point = progressStrip.mapFromItem(input, mouse.x, mouse.y)
-            if (Math.abs(point.y - 0.5) > 4 || point.x < 0 || point.x > progressStrip.width) return
-            seekTrack = root.progressTrackKey
-            seekStartX = point.x
-        }
-        onPositionChanged: mouse => {
-            if (!seekTrack || !(pressedButtons & Qt.LeftButton)) return
-            const point = progressStrip.mapFromItem(input, mouse.x, mouse.y)
-            if (!suppressClick && Math.abs(point.x - seekStartX) < Qt.styleHints.startDragDistance) return
-            suppressClick = true
-            seekFraction = root.canScrub && seekTrack === root.progressTrackKey
-                ? Progress.ratio(Math.max(0, point.x), progressStrip.width) : -1
-        }
-        onReleased: mouse => {
-            if (mouse.button !== Qt.LeftButton || !seekTrack) return
-            const sameTrack = root.watching && root.canScrub && seekTrack === root.progressTrackKey
-            if (!sameTrack) suppressClick = true
-            if (sameTrack && seekFraction >= 0) {
-                const point = progressStrip.mapFromItem(input, mouse.x, mouse.y)
-                root.timingPlayer.position = Progress.ratio(Math.max(0, point.x), progressStrip.width) * root.trackDuration
-            }
-            endSeek()
-        }
-        onCanceled: endSeek()
         onClicked: mouse => {
             if (mouse.button === Qt.RightButton) {
                 if (mouse.modifiers & Qt.ShiftModifier) root.savePresentationSetting("compactMode", !root.compactMode)
                 else root.cycleSpectrumMode()
-            } else if (!suppressClick && root.service) root.service.requestPlaybackToggle()
+            } else if (mouse.button === Qt.MiddleButton || hitProgress(mouse.x, mouse.y)) {
+                root.toggleSeekPopup()
+            } else if (root.service) root.service.requestPlaybackToggle()
         }
         onWheel: wheel => {
             const delta = wheel.angleDelta.y

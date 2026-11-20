@@ -1,4 +1,5 @@
 {
   "audioUnavailable": "Vizamp cannot read speaker audio",
-  "trackProgress": "%1 of %2 elapsed"
+  "trackProgress": "%1 of %2 elapsed",
+  "seekTrack": "Seek within the track"
 }
