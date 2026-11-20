@@ -8,7 +8,7 @@ Vizamp puts a live audio spectrum in your Omarchy bar. Peaks throw sparks, and t
 
 The spectrogram shows bass at the bottom and recent audio at the right. Rhythm lanes turn sudden peaks into notes that travel toward the hit line. With reduced motion enabled, the spectrogram fills in place and rhythm notes light up at the line.
 
-![Vizamp’s spectrum and track title above an amber and red stacked meter](docs/vizamp-demo.gif)
+![Vizamp cycles through Ridge, Stacked Bars, Spectrogram, and Rhythm Lanes](docs/vizamp-demo.gif)
 
 [Watch the MP4](docs/vizamp-demo.mp4) · Recorded offscreen with sample audio levels.
 
