@@ -126,9 +126,13 @@ Canvas {
             ctx.strokeStyle = rail
             const beat = activity.beats[lane]
             const ring = beat ? beat.strength * (1 - beat.age / Rhythm.vibrationSeconds) : 0
-            ctx.globalAlpha = look.railOpacity + (reducedMotion ? 0 : 0.13 * activity.levels[lane]) + 0.28 * ring
+            const loudness = reducedMotion ? 0 : activity.levels[lane]
+            ctx.globalAlpha = look.railOpacity + 0.13 * loudness + 0.28 * ring
                 + (lightBackground ? 0.08 : 0)
-            ctx.lineWidth = Math.min(laneHeight * 0.55, 0.65 + 0.92 * heat * heat)
+            const thinWidth = 0.42
+            const loudWidth = Math.min(2.05, laneHeight * 0.66)
+            const thickness = Math.min(1, 0.88 * Math.pow(loudness, 1.15) + 0.35 * heat * heat)
+            ctx.lineWidth = thinWidth + (loudWidth - thinWidth) * thickness
             ctx.beginPath()
             ctx.moveTo(strike + 2, y)
             if (activity.beats[lane]) {
