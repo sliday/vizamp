@@ -21,7 +21,11 @@ BarWidget {
     readonly property bool playing: mediaStatus.playing === true
     readonly property bool capturing: watching && playing && titleMix < 0.999
     readonly property string trackLabel: Status.label(mediaStatus)
-    readonly property bool stackedMode: setting("spectrumMode", "ridge") === "stacked"
+    readonly property var modeIds: ["ridge", "stacked", "spectral", "rhythm"]
+    readonly property string spectrumMode: {
+        const configured = setting("spectrumMode", "ridge")
+        return modeIds.includes(configured) ? configured : "ridge"
+    }
 
     readonly property var display: Window.window?.screen
     readonly property real screenSpan: display ? (vertical ? display.height : display.width) : 1280
@@ -49,10 +53,11 @@ BarWidget {
         if (connectedService) connectedService.setConsumer(root, watching, capturing)
     }
 
-    function toggleSpectrumMode() {
+    function cycleSpectrumMode() {
         if (!bar?.shell) return
-        const nextSettings = Object.assign({}, settings, { spectrumMode: stackedMode ? "ridge" : "stacked" })
-        bar.shell.updateEntryInline(moduleName, nextSettings)
+        const nextIndex = (modeIds.indexOf(spectrumMode) + 1) % modeIds.length
+        const nextSettings = Object.assign({}, settings, { spectrumMode: modeIds[nextIndex] })
+        if (bar.shell.updateEntryInline(moduleName, nextSettings)) modePreview.restart()
     }
 
     onServiceChanged: Qt.callLater(syncConsumer)
@@ -106,13 +111,18 @@ BarWidget {
     readonly property int titleDwellMs: titleView.item ? titleView.item.readDuration : 3000
     property bool cycleTitle: false
     property bool hovered: false
-    readonly property bool showTitle: playing && trackLabel.length > 0 && (cycleTitle || hovered)
+    readonly property bool showTitle: playing && trackLabel.length > 0
+        && !modePreview.running && (cycleTitle || hovered)
     property real titleMix: showTitle ? 1 : 0
     clip: true
     Behavior on titleMix {
         NumberAnimation { duration: Style.duration(root.showTitle ? 260 : 220); easing.type: Easing.OutCubic }
     }
 
+    Timer {
+        id: modePreview
+        interval: 1800
+    }
     Timer {
         interval: root.cycleTitle ? root.titleDwellMs : root.titleDwellMs * 9
         running: root.watching && root.playing && root.trackLabel.length > 0
@@ -166,13 +176,13 @@ BarWidget {
                 origin.x: meter.width / 2
                 origin.y: meter.height / 2
                 axis.x: 1; axis.y: 0; axis.z: 0
-                angle: root.stackedMode ? 0 : root.rollAngle * (1 - root.titleMix)
+                angle: root.spectrumMode === "ridge" ? root.rollAngle * (1 - root.titleMix) : 0
             }
 
             Loader {
                 id: spectrumView
                 anchors.fill: parent
-                active: !root.stackedMode
+                active: root.spectrumMode === "ridge"
                 sourceComponent: SpectrumPlot {
                     trackKey: root.progressTrackKey
                     progress: root.visualProgress
@@ -186,11 +196,34 @@ BarWidget {
 
             Loader {
                 anchors.fill: parent
-                active: root.stackedMode
+                active: root.spectrumMode === "stacked"
                 sourceComponent: StackedBars {
                     levels: root.motion.levels
                     peaks: root.motion.peaks
                     background: root.background
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: root.spectrumMode === "spectral"
+                sourceComponent: Spectrogram {
+                    levels: root.motion.levels
+                    running: root.watching && root.playing
+                    reducedMotion: Style.reduceMotion
+                    background: root.background
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: root.spectrumMode === "rhythm"
+                sourceComponent: RhythmLanes {
+                    levels: root.motion.levels
+                    running: root.capturing
+                    reducedMotion: Style.reduceMotion
+                    background: root.background
+                    ink: root.accentInk
                 }
             }
         }
@@ -266,7 +299,7 @@ BarWidget {
         cursorShape: Qt.PointingHandCursor
         property int wheelDelta: 0
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) root.toggleSpectrumMode()
+            if (mouse.button === Qt.RightButton) root.cycleSpectrumMode()
             else if (root.service) root.service.requestPlaybackToggle()
         }
         onWheel: wheel => {
