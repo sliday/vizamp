@@ -9,6 +9,7 @@ Canvas {
     property string fontFamily: "monospace"
     property color ink: "#e8ac70"
     property bool active: false
+    property bool reducedMotion: false
     property double clock: 0
     property double stageClock: 0
     property double lastStep: 0
@@ -24,11 +25,20 @@ Canvas {
     property real textAlpha: 0
     onGatheringChanged: {
         stageClock=0;lastStep=Date.now();needTargets=true
+        if (reducedMotion) return
         if(gathering) {clock=0;actors=sandOrigins}
         else {
             actors.forEach(g=>{g.vx+=(Math.random()-0.5)*4;g.vy=Math.max(0,g.vy)+4+Math.random()*5})
             clearForFall=true
         }
+        requestPaint()
+    }
+    onReducedMotionChanged: {
+        actors = []
+        clock = 0
+        stageClock = 0
+        lastStep = Date.now()
+        needTargets = true
         requestPaint()
     }
     onAmountChanged: {if(amount<0.005&&!gathering)actors=[];requestPaint()}
@@ -37,7 +47,8 @@ Canvas {
     readonly property real textWidth: nativeText?fallback.implicitWidth:Math.max(0,message.length*12-2)
     readonly property real distance: textWidth+36
     readonly property real offset: textWidth>width && clock>0.8?((clock-0.8)*26)%distance:0
-    readonly property int readDuration: Math.max(3000,Math.round(800+Math.max(0,textWidth-width)/26*1000+1500))
+    readonly property int readDuration: reducedMotion ? 3000
+        : Math.max(3000, Math.round(800 + Math.max(0, textWidth - width) / 26 * 1000 + 1500))
     onActiveChanged: {if(active)clock=0;requestPaint()}
     onTextChanged: {clock=0;needTargets=true;stageClock=0;requestPaint()}
     onOffsetChanged: {if(gathering&&actors.length)needTargets=true;requestPaint()}
@@ -46,7 +57,8 @@ Canvas {
     onHeightChanged: requestPaint()
     Timer {
         interval:33
-        running:(root.active&&root.textWidth>root.width)||(root.amount>0.001&&(root.stageClock<0.7||!root.gathering))
+        running: !root.reducedMotion && ((root.active && root.textWidth > root.width)
+            || (root.amount > 0.001 && (root.stageClock < 0.7 || !root.gathering)))
         repeat:true
         onTriggered:{
             const now=Date.now(),dt=root.lastStep?(now-root.lastStep)/1000:0.033
@@ -58,23 +70,31 @@ Canvas {
     }
     Text {
         id:fallback
-        opacity:root.textAlpha
-        visible:root.nativeText
+        opacity: root.reducedMotion ? 1 : root.textAlpha
+        visible: root.reducedMotion || root.nativeText
         textFormat:Text.PlainText;text:root.text;color:root.ink
         font.family:root.fontFamily;font.pixelSize:13
-        x:root.textWidth>root.width?-root.offset:(root.width-width)/2
+        x: root.reducedMotion ? 0 : (root.textWidth > root.width ? -root.offset : (root.width - width) / 2)
+        width: root.reducedMotion ? root.width : implicitWidth
+        elide: root.reducedMotion ? Text.ElideRight : Text.ElideNone
+        horizontalAlignment: root.reducedMotion ? Text.AlignHCenter : Text.AlignLeft
         anchors.verticalCenter:parent.verticalCenter
     }
     Text {
         opacity:root.textAlpha
-        visible:root.nativeText && root.textWidth>root.width
+        visible: !root.reducedMotion && root.nativeText && root.textWidth > root.width
         textFormat:Text.PlainText;text:root.text;color:root.ink
         font.family:root.fontFamily;font.pixelSize:13
         x:root.distance-root.offset
         anchors.verticalCenter:parent.verticalCenter
     }
     onPaint: {
-        const ctx=getContext('2d'),now=Date.now()
+        const ctx = getContext('2d')
+        if (reducedMotion) {
+            ctx.clearRect(0, 0, width, height)
+            return
+        }
+        const now = Date.now()
         const dtPaint=lastPaint?(now-lastPaint)/1000:0.033
         lastPaint=now
         if(clearForFall) {ctx.clearRect(0,0,width,height);clearForFall=false}
